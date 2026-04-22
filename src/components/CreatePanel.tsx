@@ -1,8 +1,18 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Difficulty, Puzzle } from '../types/puzzle'
 import { DIFFICULTY_LABELS } from '../types/puzzle'
 import { validatePuzzle } from '../lib/puzzle'
 import { encodePuzzle, shareUrl, copyToClipboard } from '../lib/share'
+import {
+  deleteDraft,
+  downloadJson,
+  exportSinglePuzzle,
+  loadDrafts,
+  newDraftId,
+  parseImport,
+  saveDraft,
+  type StoredDraft,
+} from '../lib/drafts'
 
 /**
  * Shape of the in-progress form. Looser than Puzzle (strings instead of
@@ -19,6 +29,11 @@ interface Draft {
   title: string
   author: string
   groups: DraftGroup[] // always length 4
+}
+
+function hasAnyContent(d: Draft): boolean {
+  if (d.title.trim() || d.author.trim()) return true
+  return d.groups.some((g) => g.title.trim() || g.words.some((w) => w.trim()))
 }
 
 function emptyDraft(): Draft {
@@ -61,7 +76,30 @@ export function CreatePanel({ onBack, initialPuzzle }: { onBack: () => void; ini
       })),
     }
   })
+  const [draftId] = useState<string>(() => newDraftId())
   const [showShareFor, setShowShareFor] = useState<Puzzle | null>(null)
+  const [drafts, setDrafts] = useState<StoredDraft[]>(() => loadDrafts())
+  const [importError, setImportError] = useState<string | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // Autosave on any change. Tiny debounce via microtask isn't needed --
+  // localStorage writes are fast and the draft object is small. We don't
+  // re-read `drafts` state here because the dropdown filters out the
+  // current draft anyway -- autosaves don't affect what it shows.
+  useEffect(() => {
+    if (!hasAnyContent(draft)) return
+    saveDraft({
+      id: draftId,
+      savedAt: Date.now(),
+      title: draft.title,
+      author: draft.author,
+      groups: draft.groups.map((g) => ({
+        title: g.title,
+        words: g.words,
+        difficulty: g.difficulty,
+      })),
+    })
+  }, [draft, draftId])
 
   const validation = useMemo(() => validatePuzzle(draftToPuzzle(draft)), [draft])
 
@@ -90,6 +128,66 @@ export function CreatePanel({ onBack, initialPuzzle }: { onBack: () => void; ini
     if (!validation.ok) return
     setShowShareFor(validation.puzzle)
     window.location.hash = `p=${encodePuzzle(validation.puzzle)}`
+    // Finished puzzles don't need to clutter the drafts list.
+    deleteDraft(draftId)
+  }
+
+  function handleExport() {
+    if (!validation.ok) return
+    const name = validation.puzzle.title || 'connections-puzzle'
+    downloadJson(exportSinglePuzzle(validation.puzzle, name), name.replace(/\s+/g, '-').toLowerCase())
+  }
+
+  function handleImportClick() {
+    fileInputRef.current?.click()
+  }
+
+  function handleImportFile(e: React.ChangeEvent<HTMLInputElement>) {
+    setImportError(null)
+    const file = e.target.files?.[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = () => {
+      try {
+        const items = parseImport(String(reader.result))
+        if (items.length === 0) throw new Error('No puzzles found')
+        const first = validatePuzzle(items[0])
+        if (!first.ok) throw new Error(first.error)
+        const p = first.puzzle
+        setDraft({
+          title: p.title ?? '',
+          author: p.author ?? '',
+          groups: p.groups.map((g) => ({
+            title: g.title,
+            words: [...g.words],
+            difficulty: g.difficulty,
+          })),
+        })
+      } catch (err) {
+        setImportError(err instanceof Error ? err.message : 'Could not parse file')
+      }
+    }
+    reader.readAsText(file)
+    e.target.value = ''
+  }
+
+  function handleLoadDraft(d: StoredDraft) {
+    setDraft({
+      title: d.title,
+      author: d.author,
+      groups: d.groups.map((g) => ({
+        title: g.title,
+        words: g.words.length === 4 ? g.words : ['', '', '', ''],
+        difficulty: (g.difficulty === 0 || g.difficulty === 1 || g.difficulty === 2 || g.difficulty === 3)
+          ? (g.difficulty as Difficulty)
+          : null,
+      })),
+    })
+  }
+
+  function handleDeleteDraft(id: string) {
+    deleteDraft(id)
+    setDrafts(loadDrafts())
   }
 
   if (showShareFor) {
@@ -128,6 +226,46 @@ export function CreatePanel({ onBack, initialPuzzle }: { onBack: () => void; ini
           maxLength={40}
         />
       </div>
+
+      {/* Drafts + import/export toolbar */}
+      <div className="flex items-center gap-2 mb-3 flex-wrap">
+        <button
+          type="button"
+          onClick={handleImportClick}
+          className="px-3 py-1.5 rounded-md bg-[var(--surface)] border border-[var(--border)] text-[var(--text)] text-xs hover:bg-[var(--color-bg-hover)]"
+        >
+          Import JSON
+        </button>
+        <button
+          type="button"
+          onClick={handleExport}
+          disabled={!validation.ok}
+          className="px-3 py-1.5 rounded-md bg-[var(--surface)] border border-[var(--border)] text-[var(--text)] text-xs hover:bg-[var(--color-bg-hover)] disabled:opacity-40"
+          title={validation.ok ? 'Download puzzle as JSON' : 'Finish the puzzle to export'}
+        >
+          Export JSON
+        </button>
+        {drafts.filter((d) => d.id !== draftId).length > 0 && (
+          <DraftsDropdown
+            drafts={drafts.filter((d) => d.id !== draftId)}
+            onLoad={handleLoadDraft}
+            onDelete={handleDeleteDraft}
+          />
+        )}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="application/json,.json"
+          onChange={handleImportFile}
+          className="hidden"
+        />
+      </div>
+
+      {importError && (
+        <div className="px-3 py-2 rounded-md bg-[var(--color-danger)]/10 border border-[var(--color-danger)]/30 text-[var(--text)] text-sm mb-3">
+          Import failed: {importError}
+        </div>
+      )}
 
       <ValidationPill validation={validation} wordsFilled={wordsFilled} />
 
@@ -238,6 +376,79 @@ function GroupEditor({
       </div>
     </div>
   )
+}
+
+function DraftsDropdown({
+  drafts,
+  onLoad,
+  onDelete,
+}: {
+  drafts: StoredDraft[]
+  onLoad: (d: StoredDraft) => void
+  onDelete: (id: string) => void
+}) {
+  const [open, setOpen] = useState(false)
+
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="px-3 py-1.5 rounded-md bg-[var(--surface)] border border-[var(--border)] text-[var(--text)] text-xs hover:bg-[var(--color-bg-hover)]"
+      >
+        Drafts ({drafts.length})
+      </button>
+      {open && (
+        <>
+          {/* Backdrop closes on outside click */}
+          <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
+          <div className="absolute z-20 left-0 mt-1 w-72 max-h-80 overflow-y-auto bg-[var(--surface)] border border-[var(--border)] rounded-md shadow-lg">
+            {drafts.map((d) => (
+              <div
+                key={d.id}
+                className="flex items-center gap-2 px-3 py-2 border-b border-[var(--border)] last:border-b-0 hover:bg-[var(--color-bg-hover)]"
+              >
+                <button
+                  type="button"
+                  onClick={() => {
+                    onLoad(d)
+                    setOpen(false)
+                  }}
+                  className="flex-1 text-left min-w-0"
+                >
+                  <div className="text-sm text-[var(--text)] truncate">
+                    {d.title.trim() || '(untitled)'}
+                  </div>
+                  <div className="text-xs text-[var(--text-dim)]">
+                    {formatRelative(d.savedAt)}
+                  </div>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onDelete(d.id)}
+                  className="text-[var(--text-dim)] hover:text-[var(--text)] text-xs px-1"
+                  title="Delete draft"
+                >
+                  ✕
+                </button>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
+function formatRelative(ts: number): string {
+  const diff = Date.now() - ts
+  const min = Math.floor(diff / 60_000)
+  if (min < 1) return 'just now'
+  if (min < 60) return `${min}m ago`
+  const hr = Math.floor(min / 60)
+  if (hr < 24) return `${hr}h ago`
+  const days = Math.floor(hr / 24)
+  return `${days}d ago`
 }
 
 function ShareScreen({ puzzle, onEdit, onBack }: { puzzle: Puzzle; onEdit: () => void; onBack: () => void }) {
