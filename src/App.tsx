@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { ThemePicker } from './components/ThemePicker'
 import { CreatePanel } from './components/CreatePanel'
+import { PlayPanel } from './components/PlayPanel'
 import { readMode } from './lib/share'
 import type { Mode } from './lib/share'
 
@@ -28,7 +29,7 @@ export default function App() {
 
       {mode.kind === 'home' && <HomeScreen onCreate={goCreate} />}
       {mode.kind === 'create' && <CreatePanel onBack={goHome} />}
-      {mode.kind === 'play' && <PlayPlaceholder title={mode.puzzle.title} onBack={goHome} />}
+      {mode.kind === 'play' && <PlayPanel puzzle={mode.puzzle} onBack={goHome} onCreate={goCreate} />}
       {mode.kind === 'invalid' && <InvalidScreen onBack={goHome} onCreate={goCreate} />}
     </div>
   )
@@ -57,22 +58,6 @@ function HomeScreen({ onCreate }: { onCreate: () => void }) {
       <p className="text-[var(--text-dim)] text-xs mt-8">
         Puzzles live entirely in the share link -- no accounts, no database, nothing tracked.
       </p>
-    </div>
-  )
-}
-
-function PlayPlaceholder({ title, onBack }: { title?: string; onBack: () => void }) {
-  return (
-    <div className="max-w-xl mx-auto p-8 pt-16 text-center">
-      <h1 className="text-2xl font-bold text-[var(--text)] mb-2">{title ?? 'Untitled puzzle'}</h1>
-      <p className="text-[var(--text-dim)] mb-6">Play panel coming in the next commit.</p>
-      <button
-        type="button"
-        onClick={onBack}
-        className="px-4 py-2 rounded-lg bg-[var(--surface)] border border-[var(--border)] text-[var(--text)]"
-      >
-        Home
-      </button>
     </div>
   )
 }

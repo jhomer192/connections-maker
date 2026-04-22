@@ -75,3 +75,16 @@ body {
 .group-reveal {
   animation: group-reveal 0.4s ease-out;
 }
+
+/* Auto-dismissing toast: fade in, hold, fade out, all via CSS so we don't
+   need setState-in-effect to clear it. Remount via `key={counter}` to
+   replay on each event. */
+@keyframes toast-flash {
+  0% { opacity: 0; transform: translate(-50%, -10px); }
+  10% { opacity: 1; transform: translate(-50%, 0); }
+  80% { opacity: 1; transform: translate(-50%, 0); }
+  100% { opacity: 0; transform: translate(-50%, -10px); }
+}
+.toast-flash {
+  animation: toast-flash 1.6s ease forwards;
+}
