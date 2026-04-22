@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import type { Difficulty, Puzzle } from '../types/puzzle'
 import { DIFFICULTY_LABELS } from '../types/puzzle'
 import { validatePuzzle } from '../lib/puzzle'
-import { modePath, shareUrl, copyToClipboard } from '../lib/share'
+import { modePath, shareUrl, copyToClipboard, getShortUrl } from '../lib/share'
 import {
   deleteDraft,
   exportSinglePuzzle,
@@ -576,18 +576,24 @@ function formatRelative(ts: number): string {
 
 function ShareScreen({ puzzle, onEdit, onBack }: { puzzle: Puzzle; onEdit: () => void; onBack: () => void }) {
   const url = shareUrl(puzzle)
-  const [copied, setCopied] = useState(false)
+  // null = idle, 'working' during tinyurl fetch, 'short'/'full' after copy.
+  const [copyState, setCopyState] = useState<null | 'working' | 'short' | 'full'>(null)
 
   async function handleCopy() {
-    const ok = await copyToClipboard(url)
-    if (ok) {
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
+    setCopyState('working')
+    const short = await getShortUrl(url)
+    const toCopy = short ?? url
+    const ok = await copyToClipboard(toCopy)
+    if (!ok) {
+      setCopyState(null)
+      return
     }
+    setCopyState(short ? 'short' : 'full')
+    setTimeout(() => setCopyState(null), 2500)
   }
 
   function handlePlay() {
-    // Hash is already set -- reload so App re-reads mode and enters Play.
+    // URL is already set via pushState -- reload so App re-reads mode and enters Play.
     window.location.reload()
   }
 
@@ -610,7 +616,13 @@ function ShareScreen({ puzzle, onEdit, onBack }: { puzzle: Puzzle; onEdit: () =>
           onClick={handleCopy}
           className="w-full py-3 rounded-lg bg-[var(--accent)] text-[#111] font-semibold hover:brightness-110 transition-all"
         >
-          {copied ? 'Copied!' : 'Copy link'}
+          {copyState === 'working'
+            ? 'Shortening…'
+            : copyState === 'short'
+              ? 'Short link copied!'
+              : copyState === 'full'
+                ? 'Copied (full link)'
+                : 'Copy link'}
         </button>
         <button
           type="button"

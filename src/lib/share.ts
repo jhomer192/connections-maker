@@ -108,6 +108,34 @@ export function readMode(): Mode {
 }
 
 /**
+ * Run a puzzle URL through TinyURL's public shortener. Full puzzle URLs
+ * run 500-800 chars because the puzzle data rides in the querystring, and
+ * SMS refuses to auto-link anything that long (and segments a 700-char
+ * message 4+ ways, breaking the link in transit). A shortened
+ * `tinyurl.com/xxxxx` is ~25 chars and always auto-links.
+ *
+ * TinyURL's GET endpoint CORS-reflects the request origin so this works
+ * from the github.io static site. Returns null on any failure so the
+ * caller can fall back to the full URL.
+ *
+ * Trade-off: the puzzle data now also passes through TinyURL's servers
+ * instead of being strictly client-to-recipient. For user-authored
+ * puzzles meant to be shared, that's an acceptable delta.
+ */
+export async function getShortUrl(fullUrl: string): Promise<string | null> {
+  try {
+    const r = await fetch(
+      `https://tinyurl.com/api-create.php?url=${encodeURIComponent(fullUrl)}`,
+    )
+    if (!r.ok) return null
+    const short = (await r.text()).trim()
+    return short.startsWith('http') ? short : null
+  } catch {
+    return null
+  }
+}
+
+/**
  * Clipboard helper. Falls back to a textarea hack if the Clipboard API is
  * unavailable (older iOS Safari, non-HTTPS contexts).
  */

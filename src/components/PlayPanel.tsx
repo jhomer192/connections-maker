@@ -1,21 +1,28 @@
 import { useEffect, useState } from 'react'
 import type { Puzzle } from '../types/puzzle'
 import { usePuzzleState } from '../hooks/usePuzzleState'
-import { copyToClipboard, shareUrl } from '../lib/share'
+import { copyToClipboard, getShortUrl, shareUrl } from '../lib/share'
 import { Tile } from './Tile'
 import { SolvedGroupBanner } from './SolvedGroupBanner'
 import { ResultsScreen } from './ResultsScreen'
 
 export function PlayPanel({ puzzle, onBack, onCreate }: { puzzle: Puzzle; onBack: () => void; onCreate: () => void }) {
   const state = usePuzzleState(puzzle)
-  const [copied, setCopied] = useState(false)
+  // null = idle, 'working' during tinyurl fetch, 'short'/'full' after copy.
+  const [copyState, setCopyState] = useState<null | 'working' | 'short' | 'full'>(null)
 
   async function handleCopyLink() {
-    const ok = await copyToClipboard(shareUrl(puzzle))
-    if (ok) {
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
+    setCopyState('working')
+    const full = shareUrl(puzzle)
+    const short = await getShortUrl(full)
+    const toCopy = short ?? full
+    const ok = await copyToClipboard(toCopy)
+    if (!ok) {
+      setCopyState(null)
+      return
     }
+    setCopyState(short ? 'short' : 'full')
+    setTimeout(() => setCopyState(null), 2500)
   }
 
   // Keyboard shortcuts: Enter submits when 4 selected, Esc deselects.
@@ -69,7 +76,13 @@ export function PlayPanel({ puzzle, onBack, onCreate }: { puzzle: Puzzle; onBack
             <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
             <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
           </svg>
-          {copied ? 'Copied!' : 'Copy link'}
+          {copyState === 'working'
+            ? 'Shortening…'
+            : copyState === 'short'
+              ? 'Short link copied!'
+              : copyState === 'full'
+                ? 'Copied (full link)'
+                : 'Copy link'}
         </button>
         <div className="text-[var(--text-dim)] text-xs">
           {state.mistakesLeft} mistake{state.mistakesLeft === 1 ? '' : 's'} left
