@@ -13,6 +13,7 @@ import {
   saveDraft,
   type StoredDraft,
 } from '../lib/drafts'
+import { pickRandomFiller } from '../data/filler-groups'
 
 /**
  * Shape of the in-progress form. Looser than Puzzle (strings instead of
@@ -122,6 +123,32 @@ export function CreatePanel({ onBack, initialPuzzle }: { onBack: () => void; ini
         i === gi ? { ...g, words: g.words.map((w, j) => (j === wi ? value : w)) } : g,
       ),
     }))
+  }
+
+  // Swap a random pre-built filler into one group slot, keeping the current
+  // color so we don't break the "4 distinct difficulties" invariant. Any word
+  // already used in another group is avoided.
+  function randomFillGroup(gi: number) {
+    setDraft((d) => {
+      const otherWords = new Set<string>()
+      d.groups.forEach((g, i) => {
+        if (i === gi) return
+        g.words.forEach((w) => {
+          const t = w.trim()
+          if (t) otherWords.add(t)
+        })
+      })
+      const current = d.groups[gi]
+      const filler = pickRandomFiller(otherWords, current.difficulty)
+      return {
+        ...d,
+        groups: d.groups.map((g, i) =>
+          i === gi
+            ? { title: filler.title, words: [...filler.words], difficulty: current.difficulty ?? filler.difficulty }
+            : g,
+        ),
+      }
+    })
   }
 
   function handleGenerate() {
@@ -278,6 +305,7 @@ export function CreatePanel({ onBack, initialPuzzle }: { onBack: () => void; ini
             usedDifficulties={draft.groups.filter((_, i) => i !== gi).map((x) => x.difficulty)}
             onUpdate={(patch) => updateGroup(gi, patch)}
             onWordChange={(wi, value) => updateWord(gi, wi, value)}
+            onRandomFill={() => randomFillGroup(gi)}
           />
         ))}
       </div>
@@ -322,14 +350,19 @@ function GroupEditor({
   usedDifficulties,
   onUpdate,
   onWordChange,
+  onRandomFill,
 }: {
   index: number
   group: DraftGroup
   usedDifficulties: (Difficulty | null)[]
   onUpdate: (patch: Partial<DraftGroup>) => void
   onWordChange: (wi: number, value: string) => void
+  onRandomFill: () => void
 }) {
   const bandColor = group.difficulty !== null ? `var(--diff-${group.difficulty})` : 'var(--border)'
+  const rollTitle = group.difficulty !== null
+    ? `Random ${DIFFICULTY_LABELS[group.difficulty].toLowerCase()} filler`
+    : 'Random filler'
   return (
     <div className="bg-[var(--surface)] rounded-lg border border-[var(--border)] overflow-hidden">
       <div className="h-1.5" style={{ background: bandColor }} />
@@ -344,6 +377,15 @@ function GroupEditor({
             className="flex-1 bg-transparent text-[var(--text)] font-medium placeholder:text-[var(--text-dim)] focus:outline-none"
             maxLength={60}
           />
+          <button
+            type="button"
+            onClick={onRandomFill}
+            title={rollTitle}
+            aria-label={rollTitle}
+            className="px-2 py-1 text-base rounded border border-[var(--border)] bg-[var(--bg)] hover:bg-[var(--color-bg-hover)] transition-colors"
+          >
+            🎲
+          </button>
           <select
             value={group.difficulty ?? ''}
             onChange={(e) => {
