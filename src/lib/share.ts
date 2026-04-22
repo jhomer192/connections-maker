@@ -2,17 +2,23 @@ import type { Puzzle } from '../types/puzzle'
 import { validatePuzzle } from './puzzle'
 
 /**
- * URL hash encoding for puzzles.
+ * URL encoding for puzzles.
  *
  * Puzzles serialize to JSON, then to base64url (same as JWT segments:
- * swap `+/` for `-_` and drop `=` padding). This keeps the hash safe
- * across URL-shortening and chat apps that sometimes munge `+` or `=`.
+ * swap `+/` for `-_` and drop `=` padding). A full 16-word puzzle is
+ * ~300 bytes of JSON, ~400 chars of base64 -- well under every browser's
+ * URL limit.
  *
- * A full 16-word puzzle is ~300 bytes of JSON, ~400 chars of base64 --
- * well under every browser's URL limit.
+ * We use a QUERY STRING (`?p=...`) rather than a hash fragment. Hash
+ * fragments look ambiguous to chat-app auto-linkers and unfurlers (some
+ * truncate at `#`, and unfurlers never see past it so every puzzle
+ * previews as the homepage). Query strings are unambiguous URLs that
+ * every client recognises. Links from before this change used `#p=` and
+ * `#create`, so readMode() falls back to the hash form for compat.
  *
- * The hash never hits a server, so puzzle content stays private between
- * the creator and whoever they share the link with. No DB required.
+ * Puzzle bytes still stay with the sender/recipient in practice -- the
+ * hosting static server (GH Pages) gets the querystring in its access
+ * logs but never does anything with it, and there's no database.
  */
 
 export function encodePuzzle(puzzle: Puzzle): string {
@@ -51,14 +57,24 @@ export function decodePuzzle(encoded: string): Puzzle | null {
  */
 export function shareUrl(puzzle: Puzzle): string {
   const base = `${window.location.origin}${window.location.pathname}`
-  return `${base}#p=${encodePuzzle(puzzle)}`
+  return `${base}?p=${encodePuzzle(puzzle)}`
 }
 
 /**
- * Parse the current URL hash into a mode decision.
- *   #p=...     -> play that puzzle
- *   #create    -> create mode
- *   otherwise  -> home
+ * URL path for a mode, relative to location.pathname. Used with pushState
+ * so we never trigger a real navigation -- the SPA just re-renders.
+ */
+export function modePath(mode: 'home' | 'create' | { play: Puzzle }): string {
+  const path = window.location.pathname
+  if (mode === 'home') return path
+  if (mode === 'create') return `${path}?create`
+  return `${path}?p=${encodePuzzle(mode.play)}`
+}
+
+/**
+ * Parse the current URL into a mode decision. Prefers query params
+ * (`?p=...`, `?create`); falls back to the legacy hash form (`#p=...`,
+ * `#create`) so links shared before the query-string switch still open.
  */
 export type Mode =
   | { kind: 'home' }
@@ -67,6 +83,20 @@ export type Mode =
   | { kind: 'invalid' }
 
 export function readMode(): Mode {
+  // Preferred: query string.
+  const search = window.location.search.replace(/^\?/, '')
+  if (search) {
+    if (search === 'create' || search.startsWith('create&') || search.startsWith('create=')) {
+      return { kind: 'create' }
+    }
+    const params = new URLSearchParams(search)
+    const p = params.get('p')
+    if (p) {
+      const puzzle = decodePuzzle(p)
+      return puzzle ? { kind: 'play', puzzle } : { kind: 'invalid' }
+    }
+  }
+  // Legacy fallback: hash fragment.
   const hash = window.location.hash.replace(/^#/, '')
   if (!hash) return { kind: 'home' }
   if (hash === 'create') return { kind: 'create' }

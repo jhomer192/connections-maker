@@ -2,27 +2,43 @@ import { useEffect, useState } from 'react'
 import { ThemePicker } from './components/ThemePicker'
 import { CreatePanel } from './components/CreatePanel'
 import { PlayPanel } from './components/PlayPanel'
-import { encodePuzzle, readMode } from './lib/share'
+import { modePath, readMode } from './lib/share'
 import type { Mode } from './lib/share'
 import { pickExample } from './data/examples'
+
+/**
+ * Push a new URL onto history without reloading, then rerender by
+ * re-reading the URL into mode. We listen to popstate so back/forward
+ * from the browser also rerenders.
+ */
+function navigate(path: string, setMode: (m: Mode) => void) {
+  window.history.pushState(null, '', path)
+  setMode(readMode())
+}
 
 export default function App() {
   const [mode, setMode] = useState<Mode>(() => readMode())
 
   useEffect(() => {
-    const onHash = () => setMode(readMode())
-    window.addEventListener('hashchange', onHash)
-    return () => window.removeEventListener('hashchange', onHash)
+    const onPop = () => setMode(readMode())
+    window.addEventListener('popstate', onPop)
+    // Keep the legacy hashchange listener alive for anyone still using
+    // an old `#p=` link that gets edited in the address bar.
+    window.addEventListener('hashchange', onPop)
+    return () => {
+      window.removeEventListener('popstate', onPop)
+      window.removeEventListener('hashchange', onPop)
+    }
   }, [])
 
   function goHome() {
-    window.location.hash = ''
+    navigate(modePath('home'), setMode)
   }
   function goCreate() {
-    window.location.hash = 'create'
+    navigate(modePath('create'), setMode)
   }
   function playExample() {
-    window.location.hash = `p=${encodePuzzle(pickExample())}`
+    navigate(modePath({ play: pickExample() }), setMode)
   }
 
   return (
