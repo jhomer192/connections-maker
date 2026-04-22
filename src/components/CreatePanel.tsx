@@ -575,20 +575,32 @@ function formatRelative(ts: number): string {
 }
 
 function ShareScreen({ puzzle, onEdit, onBack }: { puzzle: Puzzle; onEdit: () => void; onBack: () => void }) {
-  const url = shareUrl(puzzle)
-  // null = idle, 'working' during tinyurl fetch, 'short'/'full' after copy.
-  const [copyState, setCopyState] = useState<null | 'working' | 'short' | 'full'>(null)
+  const fullUrl = shareUrl(puzzle)
+  // Shorten on mount so the displayed URL is already the short one by the
+  // time the user goes to copy it. Falls back to full URL on failure.
+  const [shortUrl, setShortUrl] = useState<string | null>(null)
+  const [shortening, setShortening] = useState(true)
+  // null = idle, 'short'/'full' after copy.
+  const [copyState, setCopyState] = useState<null | 'short' | 'full'>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    getShortUrl(fullUrl).then((short) => {
+      if (cancelled) return
+      setShortUrl(short)
+      setShortening(false)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [fullUrl])
+
+  const displayUrl = shortUrl ?? fullUrl
 
   async function handleCopy() {
-    setCopyState('working')
-    const short = await getShortUrl(url)
-    const toCopy = short ?? url
-    const ok = await copyToClipboard(toCopy)
-    if (!ok) {
-      setCopyState(null)
-      return
-    }
-    setCopyState(short ? 'short' : 'full')
+    const ok = await copyToClipboard(displayUrl)
+    if (!ok) return
+    setCopyState(shortUrl ? 'short' : 'full')
     setTimeout(() => setCopyState(null), 2500)
   }
 
@@ -606,17 +618,20 @@ function ShareScreen({ puzzle, onEdit, onBack }: { puzzle: Puzzle; onEdit: () =>
       </p>
 
       <div className="bg-[var(--surface)] border border-[var(--border)] rounded-lg p-3 mb-4">
-        <div className="text-xs text-[var(--text-dim)] mb-1">Share URL</div>
-        <div className="text-sm font-mono break-all text-[var(--text)] select-all">{url}</div>
+        <div className="text-xs text-[var(--text-dim)] mb-1">
+          Share URL{shortening ? ' (shortening…)' : shortUrl ? '' : ' (shortener unavailable)'}
+        </div>
+        <div className="text-sm font-mono break-all text-[var(--text)] select-all">{displayUrl}</div>
       </div>
 
       <div className="flex flex-col gap-2">
         <button
           type="button"
           onClick={handleCopy}
-          className="w-full py-3 rounded-lg bg-[var(--accent)] text-[#111] font-semibold hover:brightness-110 transition-all"
+          disabled={shortening}
+          className="w-full py-3 rounded-lg bg-[var(--accent)] text-[#111] font-semibold hover:brightness-110 transition-all disabled:opacity-60"
         >
-          {copyState === 'working'
+          {shortening
             ? 'Shortening…'
             : copyState === 'short'
               ? 'Short link copied!'
