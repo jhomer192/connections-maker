@@ -2,8 +2,9 @@ import { useEffect, useState } from 'react'
 import { ThemePicker } from './components/ThemePicker'
 import { CreatePanel } from './components/CreatePanel'
 import { PlayPanel } from './components/PlayPanel'
-import { readMode } from './lib/share'
+import { encodePuzzle, readMode } from './lib/share'
 import type { Mode } from './lib/share'
+import { pickExample } from './data/examples'
 
 export default function App() {
   const [mode, setMode] = useState<Mode>(() => readMode())
@@ -20,6 +21,9 @@ export default function App() {
   function goCreate() {
     window.location.hash = 'create'
   }
+  function playExample() {
+    window.location.hash = `p=${encodePuzzle(pickExample())}`
+  }
 
   return (
     <div className="min-h-screen">
@@ -27,7 +31,7 @@ export default function App() {
         <ThemePicker />
       </div>
 
-      {mode.kind === 'home' && <HomeScreen onCreate={goCreate} />}
+      {mode.kind === 'home' && <HomeScreen onCreate={goCreate} onExample={playExample} />}
       {mode.kind === 'create' && <CreatePanel onBack={goHome} />}
       {mode.kind === 'play' && <PlayPanel puzzle={mode.puzzle} onBack={goHome} onCreate={goCreate} />}
       {mode.kind === 'invalid' && <InvalidScreen onBack={goHome} onCreate={goCreate} />}
@@ -35,7 +39,7 @@ export default function App() {
   )
 }
 
-function HomeScreen({ onCreate }: { onCreate: () => void }) {
+function HomeScreen({ onCreate, onExample }: { onCreate: () => void; onExample: () => void }) {
   return (
     <div className="max-w-xl mx-auto p-8 pt-16 text-center">
       <div className="flex items-center justify-center gap-2 mb-4">
@@ -55,6 +59,22 @@ function HomeScreen({ onCreate }: { onCreate: () => void }) {
       >
         Create a puzzle
       </button>
+      <button
+        type="button"
+        onClick={onExample}
+        className="w-full py-3 rounded-lg bg-[var(--surface)] border border-[var(--border)] text-[var(--text)] hover:bg-[var(--color-bg-hover)] transition-all"
+      >
+        Play an example
+      </button>
+      <div className="mt-10 text-left text-sm text-[var(--text-dim)] space-y-2">
+        <p className="font-semibold text-[var(--text)]">How it works</p>
+        <ol className="list-decimal list-inside space-y-1">
+          <li>Pick 16 words you can split into 4 groups of 4.</li>
+          <li>Give each group a theme title and a color.</li>
+          <li>Copy the generated share link and send it to friends.</li>
+          <li>They solve it in their browser -- no install, no account.</li>
+        </ol>
+      </div>
       <p className="text-[var(--text-dim)] text-xs mt-8">
         Puzzles live entirely in the share link -- no accounts, no database, nothing tracked.
       </p>
