@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import confetti from 'canvas-confetti'
 import type { Puzzle } from '../types/puzzle'
 import { DIFFICULTY_EMOJI } from '../types/puzzle'
 import { copyToClipboard, shareUrl } from '../lib/share'
@@ -36,6 +37,31 @@ export function ResultsScreen({
   const [copied, setCopied] = useState(false)
   const mistakes = guesses.filter((g) => !isCorrect(g)).length
   const recap = buildRecap(puzzle, status, guesses)
+
+  // Fire confetti on mount for a win. Two bursts at canvas edges so
+  // the particles cross-cross the screen rather than piling up center.
+  useEffect(() => {
+    if (status !== 'won') return
+    const end = Date.now() + 600
+    const burst = () => {
+      confetti({
+        particleCount: 40,
+        angle: 60,
+        spread: 55,
+        origin: { x: 0, y: 0.7 },
+        colors: ['#f9df6d', '#a0c35a', '#b0c4ef', '#ba81c5'],
+      })
+      confetti({
+        particleCount: 40,
+        angle: 120,
+        spread: 55,
+        origin: { x: 1, y: 0.7 },
+        colors: ['#f9df6d', '#a0c35a', '#b0c4ef', '#ba81c5'],
+      })
+      if (Date.now() < end) requestAnimationFrame(burst)
+    }
+    burst()
+  }, [status])
 
   async function handleCopy() {
     const ok = await copyToClipboard(recap)

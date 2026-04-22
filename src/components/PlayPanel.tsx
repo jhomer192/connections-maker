@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import type { Puzzle } from '../types/puzzle'
 import { usePuzzleState } from '../hooks/usePuzzleState'
 import { Tile } from './Tile'
@@ -6,6 +7,24 @@ import { ResultsScreen } from './ResultsScreen'
 
 export function PlayPanel({ puzzle, onBack, onCreate }: { puzzle: Puzzle; onBack: () => void; onCreate: () => void }) {
   const state = usePuzzleState(puzzle)
+
+  // Keyboard shortcuts: Enter submits when 4 selected, Esc deselects.
+  // Scoped to document so you can hit Enter with the grid focused or not.
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      const tag = (e.target as HTMLElement | null)?.tagName
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return
+      if (e.key === 'Enter' && state.selected.length === 4) {
+        e.preventDefault()
+        state.submit()
+      } else if (e.key === 'Escape' && state.selected.length > 0) {
+        e.preventDefault()
+        state.clearSelected()
+      }
+    }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [state])
 
   if (state.status !== 'playing') {
     return (
