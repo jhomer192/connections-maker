@@ -8,20 +8,30 @@ import { ResultsScreen } from './ResultsScreen'
 
 export function PlayPanel({ puzzle, onBack, onCreate }: { puzzle: Puzzle; onBack: () => void; onCreate: () => void }) {
   const state = usePuzzleState(puzzle)
-  // null = idle, 'working' during tinyurl fetch, 'short'/'full' after copy.
-  const [copyState, setCopyState] = useState<null | 'working' | 'short' | 'full'>(null)
+  // Pre-shorten on mount so the Copy Link click hands over the short URL
+  // instantly. Falls back to full URL if the shortener fails / is slow.
+  const [shortUrl, setShortUrl] = useState<string | null>(null)
+  const [shortening, setShortening] = useState(true)
+  // null = idle, 'short'/'full' after copy.
+  const [copyState, setCopyState] = useState<null | 'short' | 'full'>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    getShortUrl(shareUrl(puzzle)).then((short) => {
+      if (cancelled) return
+      setShortUrl(short)
+      setShortening(false)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [puzzle])
 
   async function handleCopyLink() {
-    setCopyState('working')
-    const full = shareUrl(puzzle)
-    const short = await getShortUrl(full)
-    const toCopy = short ?? full
+    const toCopy = shortUrl ?? shareUrl(puzzle)
     const ok = await copyToClipboard(toCopy)
-    if (!ok) {
-      setCopyState(null)
-      return
-    }
-    setCopyState(short ? 'short' : 'full')
+    if (!ok) return
+    setCopyState(shortUrl ? 'short' : 'full')
     setTimeout(() => setCopyState(null), 2500)
   }
 
@@ -69,14 +79,15 @@ export function PlayPanel({ puzzle, onBack, onCreate }: { puzzle: Puzzle; onBack
         <button
           type="button"
           onClick={handleCopyLink}
-          className="px-3 py-1 rounded-full border border-[var(--border)] text-[var(--text)] text-xs hover:bg-[var(--color-bg-hover)] transition-colors flex items-center gap-1.5"
+          disabled={shortening}
+          className="px-3 py-1 rounded-full border border-[var(--border)] text-[var(--text)] text-xs hover:bg-[var(--color-bg-hover)] transition-colors flex items-center gap-1.5 disabled:opacity-60"
           title="Copy this puzzle's share link"
         >
           <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
             <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
             <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
           </svg>
-          {copyState === 'working'
+          {shortening
             ? 'Shortening…'
             : copyState === 'short'
               ? 'Short link copied!'
