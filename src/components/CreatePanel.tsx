@@ -1,11 +1,10 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { Difficulty, Puzzle } from '../types/puzzle'
 import { DIFFICULTY_LABELS } from '../types/puzzle'
 import { validatePuzzle } from '../lib/puzzle'
 import { encodePuzzle, shareUrl, copyToClipboard } from '../lib/share'
 import {
   deleteDraft,
-  downloadJson,
   exportSinglePuzzle,
   loadDrafts,
   newDraftId,
@@ -80,8 +79,10 @@ export function CreatePanel({ onBack, initialPuzzle }: { onBack: () => void; ini
   const [draftId] = useState<string>(() => newDraftId())
   const [showShareFor, setShowShareFor] = useState<Puzzle | null>(null)
   const [drafts, setDrafts] = useState<StoredDraft[]>(() => loadDrafts())
+  const [importOpen, setImportOpen] = useState(false)
+  const [importText, setImportText] = useState('')
   const [importError, setImportError] = useState<string | null>(null)
-  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [exportBanner, setExportBanner] = useState<'copied' | 'failed' | null>(null)
 
   // Autosave on any change. Tiny debounce via microtask isn't needed --
   // localStorage writes are fast and the draft object is small. We don't
@@ -159,43 +160,43 @@ export function CreatePanel({ onBack, initialPuzzle }: { onBack: () => void; ini
     deleteDraft(draftId)
   }
 
-  function handleExport() {
+  async function handleExport() {
     if (!validation.ok) return
     const name = validation.puzzle.title || 'connections-puzzle'
-    downloadJson(exportSinglePuzzle(validation.puzzle, name), name.replace(/\s+/g, '-').toLowerCase())
+    const json = exportSinglePuzzle(validation.puzzle, name)
+    const ok = await copyToClipboard(json)
+    setExportBanner(ok ? 'copied' : 'failed')
+    setTimeout(() => setExportBanner(null), 2500)
   }
 
-  function handleImportClick() {
-    fileInputRef.current?.click()
-  }
-
-  function handleImportFile(e: React.ChangeEvent<HTMLInputElement>) {
+  function handleImportOpen() {
     setImportError(null)
-    const file = e.target.files?.[0]
-    if (!file) return
-    const reader = new FileReader()
-    reader.onload = () => {
-      try {
-        const items = parseImport(String(reader.result))
-        if (items.length === 0) throw new Error('No puzzles found')
-        const first = validatePuzzle(items[0])
-        if (!first.ok) throw new Error(first.error)
-        const p = first.puzzle
-        setDraft({
-          title: p.title ?? '',
-          author: p.author ?? '',
-          groups: p.groups.map((g) => ({
-            title: g.title,
-            words: [...g.words],
-            difficulty: g.difficulty,
-          })),
-        })
-      } catch (err) {
-        setImportError(err instanceof Error ? err.message : 'Could not parse file')
-      }
+    setImportText('')
+    setImportOpen(true)
+  }
+
+  function handleImportSubmit() {
+    setImportError(null)
+    try {
+      const items = parseImport(importText)
+      if (items.length === 0) throw new Error('No puzzles found')
+      const first = validatePuzzle(items[0])
+      if (!first.ok) throw new Error(first.error)
+      const p = first.puzzle
+      setDraft({
+        title: p.title ?? '',
+        author: p.author ?? '',
+        groups: p.groups.map((g) => ({
+          title: g.title,
+          words: [...g.words],
+          difficulty: g.difficulty,
+        })),
+      })
+      setImportOpen(false)
+      setImportText('')
+    } catch (err) {
+      setImportError(err instanceof Error ? err.message : 'Could not parse JSON')
     }
-    reader.readAsText(file)
-    e.target.value = ''
   }
 
   function handleLoadDraft(d: StoredDraft) {
@@ -258,7 +259,7 @@ export function CreatePanel({ onBack, initialPuzzle }: { onBack: () => void; ini
       <div className="flex items-center gap-2 mb-3 flex-wrap">
         <button
           type="button"
-          onClick={handleImportClick}
+          onClick={handleImportOpen}
           className="px-3 py-1.5 rounded-md bg-[var(--surface)] border border-[var(--border)] text-[var(--text)] text-xs hover:bg-[var(--color-bg-hover)]"
         >
           Import JSON
@@ -268,7 +269,7 @@ export function CreatePanel({ onBack, initialPuzzle }: { onBack: () => void; ini
           onClick={handleExport}
           disabled={!validation.ok}
           className="px-3 py-1.5 rounded-md bg-[var(--surface)] border border-[var(--border)] text-[var(--text)] text-xs hover:bg-[var(--color-bg-hover)] disabled:opacity-40"
-          title={validation.ok ? 'Download puzzle as JSON' : 'Finish the puzzle to export'}
+          title={validation.ok ? 'Copy puzzle JSON to clipboard' : 'Finish the puzzle to export'}
         >
           Export JSON
         </button>
@@ -279,19 +280,27 @@ export function CreatePanel({ onBack, initialPuzzle }: { onBack: () => void; ini
             onDelete={handleDeleteDraft}
           />
         )}
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="application/json,.json"
-          onChange={handleImportFile}
-          className="hidden"
-        />
       </div>
 
-      {importError && (
-        <div className="px-3 py-2 rounded-md bg-[var(--color-danger)]/10 border border-[var(--color-danger)]/30 text-[var(--text)] text-sm mb-3">
-          Import failed: {importError}
+      {exportBanner === 'copied' && (
+        <div className="px-3 py-2 rounded-md bg-[var(--accent)]/20 border border-[var(--accent)]/40 text-[var(--accent)] text-sm mb-3">
+          Puzzle JSON copied to clipboard.
         </div>
+      )}
+      {exportBanner === 'failed' && (
+        <div className="px-3 py-2 rounded-md bg-[var(--color-danger)]/10 border border-[var(--color-danger)]/30 text-[var(--text)] text-sm mb-3">
+          Clipboard copy failed. Try again, or use the share link instead.
+        </div>
+      )}
+
+      {importOpen && (
+        <ImportModal
+          text={importText}
+          error={importError}
+          onChange={setImportText}
+          onSubmit={handleImportSubmit}
+          onClose={() => setImportOpen(false)}
+        />
       )}
 
       <ValidationPill validation={validation} wordsFilled={wordsFilled} />
@@ -414,6 +423,76 @@ function GroupEditor({
               maxLength={30}
             />
           ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function ImportModal({
+  text,
+  error,
+  onChange,
+  onSubmit,
+  onClose,
+}: {
+  text: string
+  error: string | null
+  onChange: (v: string) => void
+  onSubmit: () => void
+  onClose: () => void
+}) {
+  return (
+    <div
+      className="fixed inset-0 z-40 flex items-center justify-center bg-black/60 p-4"
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-lg bg-[var(--surface)] border border-[var(--border)] rounded-lg p-5 shadow-xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-lg font-bold text-[var(--text)]">Import puzzle JSON</h2>
+          <button
+            type="button"
+            onClick={onClose}
+            className="text-[var(--text-dim)] hover:text-[var(--text)] text-lg leading-none"
+            aria-label="Close"
+          >
+            ×
+          </button>
+        </div>
+        <p className="text-sm text-[var(--text-dim)] mb-3">
+          Paste a puzzle bundle or a bare puzzle object below.
+        </p>
+        <textarea
+          value={text}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder='{"v":1,"groups":[...]}'
+          className="w-full h-48 bg-[var(--bg)] border border-[var(--border)] rounded p-2 text-sm font-mono text-[var(--text)] placeholder:text-[var(--text-dim)] focus:outline-none focus:border-[var(--accent)] resize-y"
+          autoFocus
+        />
+        {error && (
+          <div className="mt-2 px-3 py-2 rounded-md bg-[var(--color-danger)]/10 border border-[var(--color-danger)]/30 text-[var(--text)] text-sm">
+            Import failed: {error}
+          </div>
+        )}
+        <div className="flex gap-2 mt-4 justify-end">
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-3 py-1.5 rounded-md bg-[var(--surface)] border border-[var(--border)] text-[var(--text)] text-sm hover:bg-[var(--color-bg-hover)]"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={onSubmit}
+            disabled={!text.trim()}
+            className="px-3 py-1.5 rounded-md bg-[var(--accent)] text-[#111] text-sm font-semibold disabled:opacity-40 hover:brightness-110"
+          >
+            Import
+          </button>
         </div>
       </div>
     </div>
