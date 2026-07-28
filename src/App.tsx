@@ -5,6 +5,7 @@ import { PlayPanel } from './components/PlayPanel'
 import { modePath, readMode } from './lib/share'
 import type { Mode } from './lib/share'
 import { pickExample } from './data/examples'
+import { track } from './lib/analytics'
 
 /**
  * Push a new URL onto history without reloading, then rerender by
@@ -18,6 +19,18 @@ function navigate(path: string, setMode: (m: Mode) => void) {
 
 export default function App() {
   const [mode, setMode] = useState<Mode>(() => readMode())
+
+  // The one number that says whether this thing is spreading: someone arrived
+  // holding a puzzle another person made. Read once, on mount, before any
+  // in-app navigation can turn 'home' into 'play'.
+  useEffect(() => {
+    const initial = readMode()
+    if (initial.kind === 'play') {
+      track('puzzle-opened-from-share-link', {
+        referrer: document.referrer ? new URL(document.referrer).hostname : 'direct',
+      })
+    }
+  }, [])
 
   useEffect(() => {
     const onPop = () => setMode(readMode())
@@ -38,6 +51,7 @@ export default function App() {
     navigate(modePath('create'), setMode)
   }
   function playExample() {
+    track('example-played')
     navigate(modePath({ play: pickExample() }), setMode)
   }
 

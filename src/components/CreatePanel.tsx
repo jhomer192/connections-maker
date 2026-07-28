@@ -3,6 +3,7 @@ import type { Difficulty, Puzzle } from '../types/puzzle'
 import { DIFFICULTY_LABELS } from '../types/puzzle'
 import { validatePuzzle } from '../lib/puzzle'
 import { modePath, shareUrl, copyToClipboard, getShortUrl } from '../lib/share'
+import { track } from '../lib/analytics'
 import {
   deleteDraft,
   exportSinglePuzzle,
@@ -154,6 +155,9 @@ export function CreatePanel({ onBack, initialPuzzle }: { onBack: () => void; ini
 
   function handleGenerate() {
     if (!validation.ok) return
+    // A finished puzzle is the supply side of the loop; opens of that link are
+    // the demand side, counted in App.
+    track('puzzle-created')
     setShowShareFor(validation.puzzle)
     // pushState (not assignment) so the URL reflects the puzzle without
     // forcing a reload; the Share screen reads shareUrl() for display.
