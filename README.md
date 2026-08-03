@@ -2,7 +2,7 @@
 
 Create, share, and play custom [NYT Connections](https://www.nytimes.com/games/connections)-style word puzzles — no account, no backend, no database.
 
-**[Play it live →](https://jhomer192.github.io/connections-maker/)**
+**[Play it live →](https://jackhomer.com/connections-maker/)**
 
 ## What it is
 
