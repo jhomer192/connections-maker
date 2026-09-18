@@ -5,9 +5,9 @@
     <link rel="icon" type="image/svg+xml" href="/connections-maker/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="canonical" href="https://jackhomer.com/connections-maker/" />
-    <meta name="description" content="Build and share your own NYT-style Connections puzzles. 16 words, 4 groups, no account required." />
-    <meta property="og:title" content="Connections Maker · Jack Homer" />
-    <meta property="og:description" content="Build and share your own NYT-style Connections puzzles. 16 words, 4 groups, no account required." />
+    <meta name="description" content="Create custom Connections puzzles with four groups of four words. Share a playable link with friends, no account required." />
+    <meta property="og:title" content="Connections Maker – Create Custom Puzzles · Jack Homer" />
+    <meta property="og:description" content="Create custom Connections puzzles with four groups of four words. Share a playable link with friends, no account required." />
     <meta property="og:type" content="website" />
     <meta property="og:url" content="https://jackhomer.com/connections-maker/" />
     <meta property="og:image" content="https://jackhomer.com/connections-maker/og-image.png" />
@@ -16,16 +16,31 @@
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:image" content="https://jackhomer.com/connections-maker/og-image.png" />
     <meta name="author" content="Jack Homer" />
-    <title>Connections Maker · Jack Homer</title>
-    <script type="application/ld+json">{"@context": "https://schema.org", "@type": "WebApplication", "name": "Connections Maker", "url": "https://jackhomer.com/connections-maker/", "description": "Build and share your own NYT-style Connections puzzles. 16 words, 4 groups, no account required.", "applicationCategory": "GameApplication", "operatingSystem": "Any", "browserRequirements": "Requires JavaScript", "isAccessibleForFree": true, "author": {"@type": "Person", "@id": "https://jackhomer.com/#jack", "name": "Jack Homer", "url": "https://jackhomer.com"}, "isPartOf": {"@type": "WebSite", "@id": "https://jackhomer.com/#site", "name": "Jack Homer", "url": "https://jackhomer.com"}, "sameAs": "https://github.com/jhomer192/connections-maker"}</script>
+    <title>Connections Maker – Create Custom Puzzles · Jack Homer</title>
+    <script type="application/ld+json">{"@context": "https://schema.org", "@type": "WebApplication", "name": "Connections Maker", "url": "https://jackhomer.com/connections-maker/", "description": "Create custom Connections puzzles with four groups of four words. Share a playable link with friends, no account required.", "applicationCategory": "GameApplication", "operatingSystem": "Any", "browserRequirements": "Requires JavaScript", "isAccessibleForFree": true, "author": {"@type": "Person", "@id": "https://jackhomer.com/#jack", "name": "Jack Homer", "url": "https://jackhomer.com"}, "isPartOf": {"@type": "WebSite", "@id": "https://jackhomer.com/#site", "name": "Jack Homer", "url": "https://jackhomer.com"}, "sameAs": "https://github.com/jhomer192/connections-maker"}</script>
     <script>(function(){var s=localStorage.getItem('connections-maker-theme');if(s)document.documentElement.setAttribute('data-theme',s)})()</script>
     <!-- Analytics: same property as jackhomer.com, so a visit here is attributable
          to the post or page that sent it. Cookieless; the website ID is public by
          design and ships in page source on every site that uses Umami. -->
     <script defer src="https://cloud.umami.is/script.js" data-website-id="9a521c26-dce4-4cf0-b5d9-5266913dc11c"></script>
+    <style>
+      .app-guide { box-sizing: border-box; max-width: 52rem; margin: 0 auto; padding: 2rem 1.25rem; color: var(--text, #a9b1d6); background: var(--bg, #16161e); font: 1rem/1.65 system-ui, sans-serif; overflow-wrap: break-word; }
+      .app-guide h2 { margin: 0 0 1rem; font-size: 1.4rem; font-weight: 700; line-height: 1.3; }
+      .app-guide p { margin: 0 0 1rem; }
+      .app-guide a { color: var(--accent, #7aa2f7); text-decoration: underline; text-underline-offset: .2em; }
+      #root:empty { display: none; }
+    </style>
   </head>
   <body>
     <div id="root"></div>
+    <section class="app-guide" aria-labelledby="app-guide-heading">
+      <h2 id="app-guide-heading">Create your own Connections puzzle</h2>
+      <p>Connections Maker is a free tool for making and sharing custom word-grouping puzzles. Write sixteen words in four hidden categories, then challenge friends to find the groups.</p>
+      <p>Choose Create, enter four category names and four words per category, and assign each group a difficulty color. Generate a share link when your puzzle is ready. Players select four related words at a time and have four mistakes to solve all the groups.</p>
+      <p>No account is required. Drafts are saved in this browser, and each share link contains the puzzle. Keep the link to play it again. This is an independent project, not affiliated with The New York Times.</p>
+      <p>Built by <a href="https://jackhomer.com/">Jack Homer</a>. <a href="https://jackhomer.com/projects/connections-maker/">Read the Connections Maker project write-up</a>.</p>
+      <noscript><p>Enable JavaScript to use the interactive app.</p></noscript>
+    </section>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
