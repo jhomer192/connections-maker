@@ -54,3 +54,5 @@ Puzzle contents are never posted to a backend of mine. Two things do reach third
 ## More
 
 Background and build notes: [jackhomer.com/projects/connections-maker](https://jackhomer.com/projects/connections-maker/)
+
+A project by [Jack Homer](https://jackhomer.com/).
